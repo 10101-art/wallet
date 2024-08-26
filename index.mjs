@@ -268,6 +268,7 @@ export function embedded10101WalletConnector({
                         if (action === 'generate') {
                             const generatedAccount = await wallet.generateNewAccount(password);
                             wallet.emit('private_key_provided', generatedAccount);
+                            await wallet.loadAccount(password);
                         } else if (action === 'import') {
                             await wallet.loadAccountByPrivateKey(privateKey, password);
                         } else {
