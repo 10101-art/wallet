@@ -110,6 +110,24 @@ class EmbeddedWallet extends EventEmitter {
         return await this.RPC.request('generateNewAccount', [password, accountName]);
     }
 
+    async getPrivateKey(accountName = 'mainAccount') {
+        this.emit('password_request');
+
+        try {
+            const password = await new Promise((resolve, reject) => {
+                this.once('password_provided', resolve);
+                this.once('password_rejected', () => {
+                    reject('User rejected the password request.');
+                });
+            });
+
+            return await this.RPC.request('getPrivateKet', [password, accountName]);
+        } catch (error) {
+            console.error('Error', error);
+            throw error;
+        }
+    }
+
     async isLocked() {
         return await this.RPC.request('isLocked');
     }

@@ -75,6 +75,11 @@ class EmbeddedWalletWorker extends EventEmitter {
     async changeAccountPassword(oldPassword, newPassword, accountName = 'mainAccount') {
         await Keystorage.changeEcnryptedAccountPassword(oldPassword, newPassword, accountName);
     }
+
+    async getPrivateKet(password, accountName = 'mainAccount') {
+        return await Keystorage.load(password, accountName);
+    }
+
     async getEncryptedAccount(accountName = 'mainAccount') {
         return await Keystorage.getEncryptedAccount(accountName);
     }
@@ -240,6 +245,7 @@ RPC.methods = {
     isLocked: worker.isLocked.bind(worker),
     unlock: worker.unlock.bind(worker),
     changeAccountPassword: worker.changeAccountPassword.bind(worker),
+    getPrivateKet: worker.getPrivateKet.bind(worker),
 };
 
 console.log('Worker started');

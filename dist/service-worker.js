@@ -53082,6 +53082,11 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
     async changeAccountPassword(oldPassword, newPassword, accountName = 'mainAccount') {
         await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].changeEcnryptedAccountPassword(oldPassword, newPassword, accountName);
     }
+
+    async getPrivateKet(password, accountName = 'mainAccount') {
+        return await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].load(password, accountName);
+    }
+
     async getEncryptedAccount(accountName = 'mainAccount') {
         return await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].getEncryptedAccount(accountName);
     }
@@ -53247,6 +53252,7 @@ RPC.methods = {
     isLocked: worker.isLocked.bind(worker),
     unlock: worker.unlock.bind(worker),
     changeAccountPassword: worker.changeAccountPassword.bind(worker),
+    getPrivateKet: worker.getPrivateKet.bind(worker),
 };
 
 console.log('Worker started');
