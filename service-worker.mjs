@@ -84,8 +84,8 @@ class EmbeddedWalletWorker extends EventEmitter {
         return await Keystorage.getEncryptedAccount(accountName);
     }
 
-    async setEncryptedAccount(encryptedKey, password, accountName = 'mainAccount') {
-        await Keystorage.setEncryptedAccount(encryptedKey, password, accountName);
+    async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
+        await Keystorage.setEncryptedAccount(encryptedKey, accountName);
     }
 
     async removeEncryptedAccount(accountName = 'mainAccount') {

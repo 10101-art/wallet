@@ -90,8 +90,8 @@ class EmbeddedWallet extends EventEmitter {
         return await this.RPC.request('getEncryptedAccount');
     }
 
-    async setEncryptedAccount(encryptedKey, password, accountName = 'mainAccount') {
-        return await this.RPC.request('setEncryptedAccount', [encryptedKey, password, accountName]);
+    async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
+        return await this.RPC.request('setEncryptedAccount', [encryptedKey, accountName]);
     }
 
     async removeEncryptedAccount(accountName = 'mainAccount') {
@@ -256,11 +256,11 @@ export function embedded10101WalletConnector({
 
                 try {
                     if (await wallet.hasSavedAccount()) {
-                        wallet.emit('password_request');
+                        wallet.emit('login_request');
 
                         const password = await new Promise((resolve, reject) => {
-                            wallet.once('password_provided', resolve);
-                            wallet.once('password_rejected', () => {
+                            wallet.once('login_provided', resolve);
+                            wallet.once('login_rejected', () => {
                                 reject(new Error('User rejected the password request.'));
                             });
                         });
@@ -269,7 +269,7 @@ export function embedded10101WalletConnector({
                             await wallet.loadAccount(password);
                             wallet.emit('account_loaded');
                         } catch (e) {
-                            wallet.emit('invalid_password');
+                            wallet.emit('login_error', e);
                             console.error('Invalid password', e);
                             throw e;
                         }

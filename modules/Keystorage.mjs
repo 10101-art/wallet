@@ -18,7 +18,7 @@ class Keystorage {
         return LocalStorage.getItem(`ecryptedKey_${accountName}`);
     }
 
-    static async setEncryptedAccount(encryptedKey, password, accountName = 'mainAccount') {
+    static async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
         await LocalStorage.setItem(`ecryptedKey_${accountName}`, encryptedKey);
     }
 

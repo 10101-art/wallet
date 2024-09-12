@@ -9709,7 +9709,7 @@ class Keystorage {
         return _LocalStorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].getItem(`ecryptedKey_${accountName}`);
     }
 
-    static async setEncryptedAccount(encryptedKey, password, accountName = 'mainAccount') {
+    static async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
         await _LocalStorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].setItem(`ecryptedKey_${accountName}`, encryptedKey);
     }
 
@@ -53091,8 +53091,8 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
         return await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].getEncryptedAccount(accountName);
     }
 
-    async setEncryptedAccount(encryptedKey, password, accountName = 'mainAccount') {
-        await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].setEncryptedAccount(encryptedKey, password, accountName);
+    async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
+        await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].setEncryptedAccount(encryptedKey, accountName);
     }
 
     async removeEncryptedAccount(accountName = 'mainAccount') {
