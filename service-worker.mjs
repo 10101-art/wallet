@@ -34,6 +34,8 @@ class EmbeddedWalletWorker extends EventEmitter {
     }
 
     async generateNewAccount(password = '', accountName = 'mainAccount') {
+        this.locked = false;
+        
         if (!password || password.trim().length === 0) {
             throw new Error('Password is required');
         }

@@ -53041,6 +53041,8 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
     }
 
     async generateNewAccount(password = '', accountName = 'mainAccount') {
+        this.locked = false;
+        
         if (!password || password.trim().length === 0) {
             throw new Error('Password is required');
         }
