@@ -34,8 +34,8 @@ class EmbeddedWalletWorker extends EventEmitter {
     }
 
     async generateNewAccount(password = '', accountName = 'mainAccount') {
-        this.locked = false;
-        
+        await this.#startAutolockTimer(120000); //Даём больше времени перед блокировкой
+
         if (!password || password.trim().length === 0) {
             throw new Error('Password is required');
         }
@@ -50,21 +50,23 @@ class EmbeddedWalletWorker extends EventEmitter {
         //Load it to web3 wallet
         await this.#loadWeb3AccountByPrivateKey(privateKey);
 
-        //delete account.privateKey; //TODO в будущем надо будет удалять приватный ключ из объекта
-
         return {address: account.address, encryptedKey, privateKey};
     }
 
-    #startAutolockTimer() {
+    #startAutolockTimer(timeout = AUTOLOCK_TIMEOUT) {
         this.locked = false;
         if (this.autolockTimer) {
             clearTimeout(this.autolockTimer);
         }
         this.autolockTimer = setTimeout(async () => {
             console.log('Autolock');
-            this.locked = true;
-            await this.#unloadWeb3Account();
-        }, AUTOLOCK_TIMEOUT);
+            await this.#lock();
+        }, timeout);
+    }
+
+    async #lock() {
+        this.locked = true;
+        await this.#unloadWeb3Account();
     }
 
 
