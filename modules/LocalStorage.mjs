@@ -16,9 +16,13 @@ class LocalStorage {
             return;
         }
 
-        await idb.set(key, value);
+        try {
+            await idb.set(key, value);
+        }catch (e) {
+            data[key] = value;
+        }
 
-        // data[key] = value;
+
     }
 
     static async removeItem(key) {
@@ -27,9 +31,12 @@ class LocalStorage {
             return;
         }
 
-        await idb.delete(key);
+        try {
+            await idb.delete(key);
+        }catch (e) {
+            delete data[key];
+        }
 
-        // delete data[key];
     }
 
     static async getItem(key) {
@@ -37,7 +44,12 @@ class LocalStorage {
             return localStorage.getItem(key);
         }
 
-        return await idb.get(key);
+        try {
+
+            return await idb.get(key);
+        }catch (e) {
+            return data[key];
+        }
 
         //  return data[key];
     }

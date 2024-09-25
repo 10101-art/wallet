@@ -60,6 +60,18 @@ class Crypto {
             format: JsonFormatter
         }).toString(CryptoJS.enc.Utf8);
     }
+
+    static hash(text) {
+        return CryptoJS.SHA256(text).toString();
+    }
+
+    static base64(text) {
+        return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(text));
+    }
+
+    static base64Decode(text) {
+        return CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(text));
+    }
 }
 
 export default Crypto;

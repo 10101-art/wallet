@@ -1,11 +1,12 @@
 import {Web3} from "web3";
 import Keystorage from "./modules/Keystorage.mjs";
 import EventEmitter from 'events';
+import Crypto from "./modules/Crypto.mjs";
 
 const FIRST_ENDPOINT = 'https://cloudflare-eth.com';
 const AUTOLOCK_TIMEOUT = 1000 * 30;
 
-class EmbeddedWalletWorker extends EventEmitter {
+export default class EmbeddedWalletWorker extends EventEmitter {
     currentAccount = null;
 
     constructor(urlOrProvider) {
@@ -33,7 +34,10 @@ class EmbeddedWalletWorker extends EventEmitter {
         this.web3 = this.web3i();
     }
 
-    async generateNewAccount(password = '', accountName = 'mainAccount') {
+    /*
+    В userRecoveryPassword надо запихивать пароль прилетающий при создании аккаунта от сервера в поле userRecoveryPassword
+     */
+    async generateNewAccount(password = '', accountName = 'mainAccount', userRecoveryPassword = null) {
         await this.#startAutolockTimer(120000); //Даём больше времени перед блокировкой
 
         if (!password || password.trim().length === 0) {
@@ -47,10 +51,56 @@ class EmbeddedWalletWorker extends EventEmitter {
         //Save it to encrypted local storage
         let encryptedKey = await Keystorage.save(privateKey, password, accountName);
 
+        //Если задан серверный пароль для восстановления
+        let restoreEncodedKey = null;
+        if (userRecoveryPassword) {//То создаём дополнительный ключ
+            restoreEncodedKey = await Keystorage.save(privateKey, userRecoveryPassword, 'restoreEncodedKey');
+        }
+
         //Load it to web3 wallet
         await this.#loadWeb3AccountByPrivateKey(privateKey);
 
-        return {address: account.address, encryptedKey, privateKey};
+        return {
+            address: account.address,
+            encryptedKey,
+            privateKey,
+            recoveryKey: this.#convertRestoreEncodedKeyToRecoveryKey(restoreEncodedKey, userRecoveryPassword)
+        };
+    }
+
+    #convertRestoreEncodedKeyToRecoveryKey(restoreEncodedKey, userRecoveryPassword) {
+        if (!restoreEncodedKey) {
+            return null;
+        }
+
+
+        let restorePasswordHash = Crypto.hash(userRecoveryPassword);
+        let versionByte = '0';
+        return versionByte + Crypto.base64(JSON.stringify({a: restoreEncodedKey, b: restorePasswordHash}));
+    }
+
+    extractRecoveryKeyData(recoveryKey) {
+        try {
+            let versionByte = recoveryKey[0];
+            let data = recoveryKey.substr(1);
+            let decodedData = JSON.parse(Crypto.base64Decode(data));
+            return {versionByte, passwordHash: decodedData.b, restoreEncodedKey: decodedData.a};
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async recoverAccount(recoveryKey, userRecoveryPassword, newPassword) {
+        let data = this.extractRecoveryKeyData(recoveryKey);
+        if (!data) {
+            throw new Error('Invalid recovery key or password');
+        }
+
+        await this.setEncryptedAccount(data.restoreEncodedKey, 'mainAccount');
+
+        await this.changeAccountPassword(userRecoveryPassword, newPassword, 'mainAccount');
+
+        return true;
     }
 
     #startAutolockTimer(timeout = AUTOLOCK_TIMEOUT) {
@@ -187,8 +237,6 @@ class EmbeddedWalletWorker extends EventEmitter {
 
 //export default EmbeddedWallet;
 
-let worker = new EmbeddedWalletWorker(FIRST_ENDPOINT);
-
 
 class HostRPC {
     requests = {};
@@ -227,55 +275,66 @@ class HostRPC {
     }
 }
 
-const RPC = new HostRPC();
-self.RPC = RPC;
+try {
 
-RPC.methods = {
-    eth_chainId: worker.eth_chainId.bind(worker),
-    getGasPrice: worker.getGasPrice.bind(worker),
-    generateNewAccount: worker.generateNewAccount.bind(worker),
-    loadAccount: worker.loadAccount.bind(worker),
-    getAddress: worker.getAddress.bind(worker),
-    isAuthorized: worker.isAuthorized.bind(worker),
-    hasSavedAccount: worker.hasSavedAccount.bind(worker),
-    getBalance: worker.getBalance.bind(worker),
-    getEncryptedAccount: worker.getEncryptedAccount.bind(worker),
-    setEncryptedAccount: worker.setEncryptedAccount.bind(worker),
-    removeEncryptedAccount: worker.removeEncryptedAccount.bind(worker),
-    loadAccountByPrivateKey: worker.loadAccountByPrivateKey.bind(worker),
-    changeProvider: worker.changeProvider.bind(worker),
-    personal_sign: worker.personal_sign.bind(worker),
-    eth_sendTransaction: worker.eth_sendTransaction.bind(worker),
-    isLocked: worker.isLocked.bind(worker),
-    unlock: worker.unlock.bind(worker),
-    changeAccountPassword: worker.changeAccountPassword.bind(worker),
-    getPrivateKet: worker.getPrivateKet.bind(worker),
-};
+    let worker = new EmbeddedWalletWorker(FIRST_ENDPOINT);
 
-console.log('Worker started');
 
-await RPC.broadcast({rpcstarted: true})
+    const RPC = new HostRPC();
+    self.RPC = RPC;
 
-setInterval(async () => {
-    await RPC.broadcast({rpcstarted: true});
-}, 1000);
+    RPC.methods = {
+        eth_chainId: worker.eth_chainId.bind(worker),
+        getGasPrice: worker.getGasPrice.bind(worker),
+        generateNewAccount: worker.generateNewAccount.bind(worker),
+        loadAccount: worker.loadAccount.bind(worker),
+        getAddress: worker.getAddress.bind(worker),
+        isAuthorized: worker.isAuthorized.bind(worker),
+        hasSavedAccount: worker.hasSavedAccount.bind(worker),
+        getBalance: worker.getBalance.bind(worker),
+        getEncryptedAccount: worker.getEncryptedAccount.bind(worker),
+        setEncryptedAccount: worker.setEncryptedAccount.bind(worker),
+        removeEncryptedAccount: worker.removeEncryptedAccount.bind(worker),
+        loadAccountByPrivateKey: worker.loadAccountByPrivateKey.bind(worker),
+        changeProvider: worker.changeProvider.bind(worker),
+        personal_sign: worker.personal_sign.bind(worker),
+        eth_sendTransaction: worker.eth_sendTransaction.bind(worker),
+        isLocked: worker.isLocked.bind(worker),
+        unlock: worker.unlock.bind(worker),
+        changeAccountPassword: worker.changeAccountPassword.bind(worker),
+        getPrivateKet: worker.getPrivateKet.bind(worker),
+        recoverAccount: worker.recoverAccount.bind(worker),
+        extractRecoveryKeyData: worker.extractRecoveryKeyData.bind(worker),
+    };
 
-self.addEventListener('activate', event => {
-    console.log('Wallet: Service worker activated');
-    event.waitUntil(clients.claim());
-    console.log('Wallet: Service worker claimed clients');
-});
+    console.log('Worker started');
 
-self.addEventListener('install', function (event) {
-    console.log('Wallet: Service worker installed');
-});
+    await RPC.broadcast({rpcstarted: true})
 
-self.addEventListener('message', async event => {
+    setInterval(async () => {
+        await RPC.broadcast({rpcstarted: true});
+    }, 1000);
 
-    if (event.data.method) {
-        await RPC.request(event.data.id, event.data.method, event.data.params, event);
-    }
+    self.addEventListener('activate', event => {
+        console.log('Wallet: Service worker activated');
+        event.waitUntil(clients.claim());
+        console.log('Wallet: Service worker claimed clients');
+    });
 
-    // console.log('Received message:', event.data);
-    // Обработка сообщения
-});
+    self.addEventListener('install', function (event) {
+        console.log('Wallet: Service worker installed');
+    });
+
+    self.addEventListener('message', async event => {
+
+        if (event.data.method) {
+            await RPC.request(event.data.id, event.data.method, event.data.params, event);
+        }
+
+        // console.log('Received message:', event.data);
+        // Обработка сообщения
+    });
+
+} catch (e) {
+    console.error(e);
+}
