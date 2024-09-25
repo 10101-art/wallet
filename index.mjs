@@ -106,8 +106,16 @@ class EmbeddedWallet extends EventEmitter {
         return await this.RPC.request('loadAccount', [password, accountName]);
     }
 
-    async generateNewAccount(password = '', accountName = 'mainAccount') {
-        return await this.RPC.request('generateNewAccount', [password, accountName]);
+    async generateNewAccount(password = '', accountName = 'mainAccount', userRecoveryPassword = null) {
+        return await this.RPC.request('generateNewAccount', [password, accountName, userRecoveryPassword]);
+    }
+
+    async recoverAccount(recoveryKey, userRecoveryPassword, newPassword) {
+        return await this.RPC.request('recoverAccount', [recoveryKey, userRecoveryPassword, newPassword]);
+    }
+
+    async extractRecoveryKeyData(recoveryKey) {
+        return await this.RPC.request('extractRecoveryKeyData', [recoveryKey]);
     }
 
     async getPrivateKey(accountName = 'mainAccount') {
@@ -250,8 +258,6 @@ export function embedded10101WalletConnector({
                         chainId: await wallet.eth_chainId()
                     };
                 }
-
-
 
 
                 try {
