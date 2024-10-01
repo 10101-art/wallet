@@ -38,7 +38,7 @@ export default class EmbeddedWalletWorker extends EventEmitter {
     В userRecoveryPassword надо запихивать пароль прилетающий при создании аккаунта от сервера в поле userRecoveryPassword
      */
     async generateNewAccount(password = '', accountName = 'mainAccount', userRecoveryPassword = null) {
-        await this.#startAutolockTimer(120000); //Даём больше времени перед блокировкой
+        await this.#startAutolockTimer(1800000); //Даём больше времени перед блокировкой
 
         if (!password || password.trim().length === 0) {
             throw new Error('Password is required');
@@ -106,17 +106,21 @@ export default class EmbeddedWalletWorker extends EventEmitter {
     #startAutolockTimer(timeout = AUTOLOCK_TIMEOUT) {
         this.locked = false;
         if (this.autolockTimer) {
-            clearTimeout(this.autolockTimer);
+            return;
+            //clearTimeout(this.autolockTimer);
         }
         this.autolockTimer = setTimeout(async () => {
             console.log('Autolock');
             await this.#lock();
+            this.autolockTimer = null;
         }, timeout);
     }
 
     async #lock() {
         this.locked = true;
         await this.#unloadWeb3Account();
+        clearTimeout(this.autolockTimer);
+        this.autolockTimer = null;
     }
 
 
@@ -188,6 +192,10 @@ export default class EmbeddedWalletWorker extends EventEmitter {
         let privateKey = await Keystorage.load(password);
         await this.#loadWeb3AccountByPrivateKey(privateKey);
         await this.#startAutolockTimer();
+    }
+
+    async lock(){
+        await this.#lock();
     }
 
     async hasSavedAccount() {
@@ -305,6 +313,7 @@ try {
         getPrivateKet: worker.getPrivateKet.bind(worker),
         recoverAccount: worker.recoverAccount.bind(worker),
         extractRecoveryKeyData: worker.extractRecoveryKeyData.bind(worker),
+        lock: worker.lock.bind(worker)
     };
 
     console.log('Worker started');

@@ -144,6 +144,9 @@ class EmbeddedWallet extends EventEmitter {
         return await this.RPC.request('unlock', [password]);
     }
 
+    async lock(){
+        return await this.RPC.request('lock',[]);
+    }
 
     async personal_sign(message, address) {
 
