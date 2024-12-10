@@ -241,6 +241,21 @@ export default class EmbeddedWalletWorker extends EventEmitter {
 
         return signedTx.transactionHash;
     }
+
+
+    async isEverythingOk() {
+        let rpcStatus = false;
+        try {
+            const chainId = await this.eth_chainId();
+            rpcStatus = typeof chainId === 'bigint';
+        } catch (e) {
+            rpcStatus = false;
+        }
+
+        return {
+            rpcStatus
+        };
+    }
 }
 
 //export default EmbeddedWallet;
@@ -313,7 +328,8 @@ try {
         getPrivateKet: worker.getPrivateKet.bind(worker),
         recoverAccount: worker.recoverAccount.bind(worker),
         extractRecoveryKeyData: worker.extractRecoveryKeyData.bind(worker),
-        lock: worker.lock.bind(worker)
+        lock: worker.lock.bind(worker),
+        isEverythingOk: worker.isEverythingOk.bind(worker)
     };
 
     console.log('Worker started');

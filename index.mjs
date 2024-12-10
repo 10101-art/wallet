@@ -210,6 +210,19 @@ class EmbeddedWallet extends EventEmitter {
         }
         return await this[rpc.method](...rpc.params);
     }
+
+    async isEverythingOk() {
+        try {
+            const status = await this.RPC.request('isEverythingOk');
+            return status;
+        } catch (error) {
+            console.error('Error checking status:', error);
+            return {
+                rpcStatus: false,
+                error: error.message
+            };
+        }
+    }
 }
 
 export default EmbeddedWallet;

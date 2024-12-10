@@ -9565,6 +9565,18 @@ class Crypto {
             format: JsonFormatter
         }).toString(crypto_js__WEBPACK_IMPORTED_MODULE_0__.enc.Utf8);
     }
+
+    static hash(text) {
+        return crypto_js__WEBPACK_IMPORTED_MODULE_0__.SHA256(text).toString();
+    }
+
+    static base64(text) {
+        return crypto_js__WEBPACK_IMPORTED_MODULE_0__.enc.Base64.stringify(crypto_js__WEBPACK_IMPORTED_MODULE_0__.enc.Utf8.parse(text));
+    }
+
+    static base64Decode(text) {
+        return crypto_js__WEBPACK_IMPORTED_MODULE_0__.enc.Utf8.stringify(crypto_js__WEBPACK_IMPORTED_MODULE_0__.enc.Base64.parse(text));
+    }
 }
 
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (Crypto);
@@ -9778,9 +9790,13 @@ class LocalStorage {
             return;
         }
 
-        await idb.set(key, value);
+        try {
+            await idb.set(key, value);
+        }catch (e) {
+            data[key] = value;
+        }
 
-        // data[key] = value;
+
     }
 
     static async removeItem(key) {
@@ -9789,9 +9805,12 @@ class LocalStorage {
             return;
         }
 
-        await idb.delete(key);
+        try {
+            await idb.delete(key);
+        }catch (e) {
+            delete data[key];
+        }
 
-        // delete data[key];
     }
 
     static async getItem(key) {
@@ -9799,7 +9818,12 @@ class LocalStorage {
             return localStorage.getItem(key);
         }
 
-        return await idb.get(key);
+        try {
+
+            return await idb.get(key);
+        }catch (e) {
+            return data[key];
+        }
 
         //  return data[key];
     }
@@ -53002,9 +53026,14 @@ var z = /*#__PURE__*/Object.freeze({
 "use strict";
 __webpack_require__.a(__webpack_module__, async (__webpack_handle_async_dependencies__, __webpack_async_result__) => { try {
 __webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ EmbeddedWalletWorker)
+/* harmony export */ });
 /* harmony import */ var web3__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! web3 */ "./node_modules/web3/lib/esm/index.js");
 /* harmony import */ var _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./modules/Keystorage.mjs */ "./modules/Keystorage.mjs");
 /* harmony import */ var events__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! events */ "./node_modules/events/events.js");
+/* harmony import */ var _modules_Crypto_mjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./modules/Crypto.mjs */ "./modules/Crypto.mjs");
+
 
 
 
@@ -53040,9 +53069,12 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
         this.web3 = this.web3i();
     }
 
-    async generateNewAccount(password = '', accountName = 'mainAccount') {
-        this.locked = false;
-        
+    /*
+    В userRecoveryPassword надо запихивать пароль прилетающий при создании аккаунта от сервера в поле userRecoveryPassword
+     */
+    async generateNewAccount(password = '', accountName = 'mainAccount', userRecoveryPassword = null) {
+        await this.#startAutolockTimer(1800000); //Даём больше времени перед блокировкой
+
         if (!password || password.trim().length === 0) {
             throw new Error('Password is required');
         }
@@ -53054,24 +53086,76 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
         //Save it to encrypted local storage
         let encryptedKey = await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].save(privateKey, password, accountName);
 
+        //Если задан серверный пароль для восстановления
+        let restoreEncodedKey = null;
+        if (userRecoveryPassword) {//То создаём дополнительный ключ
+            restoreEncodedKey = await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].save(privateKey, userRecoveryPassword, 'restoreEncodedKey');
+        }
+
         //Load it to web3 wallet
         await this.#loadWeb3AccountByPrivateKey(privateKey);
 
-        //delete account.privateKey; //TODO в будущем надо будет удалять приватный ключ из объекта
-
-        return {address: account.address, encryptedKey, privateKey};
+        return {
+            address: account.address,
+            encryptedKey,
+            privateKey,
+            recoveryKey: this.#convertRestoreEncodedKeyToRecoveryKey(restoreEncodedKey, userRecoveryPassword)
+        };
     }
 
-    #startAutolockTimer() {
+    #convertRestoreEncodedKeyToRecoveryKey(restoreEncodedKey, userRecoveryPassword) {
+        if (!restoreEncodedKey) {
+            return null;
+        }
+
+
+        let restorePasswordHash = _modules_Crypto_mjs__WEBPACK_IMPORTED_MODULE_3__["default"].hash(userRecoveryPassword);
+        let versionByte = '0';
+        return versionByte + _modules_Crypto_mjs__WEBPACK_IMPORTED_MODULE_3__["default"].base64(JSON.stringify({a: restoreEncodedKey, b: restorePasswordHash}));
+    }
+
+    extractRecoveryKeyData(recoveryKey) {
+        try {
+            let versionByte = recoveryKey[0];
+            let data = recoveryKey.substr(1);
+            let decodedData = JSON.parse(_modules_Crypto_mjs__WEBPACK_IMPORTED_MODULE_3__["default"].base64Decode(data));
+            return {versionByte, passwordHash: decodedData.b, restoreEncodedKey: decodedData.a};
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async recoverAccount(recoveryKey, userRecoveryPassword, newPassword) {
+        let data = this.extractRecoveryKeyData(recoveryKey);
+        if (!data) {
+            throw new Error('Invalid recovery key or password');
+        }
+
+        await this.setEncryptedAccount(data.restoreEncodedKey, 'mainAccount');
+
+        await this.changeAccountPassword(userRecoveryPassword, newPassword, 'mainAccount');
+
+        return true;
+    }
+
+    #startAutolockTimer(timeout = AUTOLOCK_TIMEOUT) {
         this.locked = false;
         if (this.autolockTimer) {
-            clearTimeout(this.autolockTimer);
+            return;
+            //clearTimeout(this.autolockTimer);
         }
         this.autolockTimer = setTimeout(async () => {
             console.log('Autolock');
-            this.locked = true;
-            await this.#unloadWeb3Account();
-        }, AUTOLOCK_TIMEOUT);
+            await this.#lock();
+            this.autolockTimer = null;
+        }, timeout);
+    }
+
+    async #lock() {
+        this.locked = true;
+        await this.#unloadWeb3Account();
+        clearTimeout(this.autolockTimer);
+        this.autolockTimer = null;
     }
 
 
@@ -53145,6 +53229,10 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
         await this.#startAutolockTimer();
     }
 
+    async lock(){
+        await this.#lock();
+    }
+
     async hasSavedAccount() {
         return (await _modules_Keystorage_mjs__WEBPACK_IMPORTED_MODULE_1__["default"].getEncryptedAccount()) !== null;
     }
@@ -53188,11 +53276,24 @@ class EmbeddedWalletWorker extends events__WEBPACK_IMPORTED_MODULE_2__ {
 
         return signedTx.transactionHash;
     }
+
+
+    async isEverythingOk() {
+        let rpcStatus = false;
+        try {
+            const chainId = await this.eth_chainId();
+            rpcStatus = typeof chainId === 'bigint';
+        } catch (e) {
+            rpcStatus = false;
+        }
+
+        return {
+            rpcStatus
+        };
+    }
 }
 
 //export default EmbeddedWallet;
-
-let worker = new EmbeddedWalletWorker(FIRST_ENDPOINT);
 
 
 class HostRPC {
@@ -53232,58 +53333,71 @@ class HostRPC {
     }
 }
 
-const RPC = new HostRPC();
-self.RPC = RPC;
+try {
 
-RPC.methods = {
-    eth_chainId: worker.eth_chainId.bind(worker),
-    getGasPrice: worker.getGasPrice.bind(worker),
-    generateNewAccount: worker.generateNewAccount.bind(worker),
-    loadAccount: worker.loadAccount.bind(worker),
-    getAddress: worker.getAddress.bind(worker),
-    isAuthorized: worker.isAuthorized.bind(worker),
-    hasSavedAccount: worker.hasSavedAccount.bind(worker),
-    getBalance: worker.getBalance.bind(worker),
-    getEncryptedAccount: worker.getEncryptedAccount.bind(worker),
-    setEncryptedAccount: worker.setEncryptedAccount.bind(worker),
-    removeEncryptedAccount: worker.removeEncryptedAccount.bind(worker),
-    loadAccountByPrivateKey: worker.loadAccountByPrivateKey.bind(worker),
-    changeProvider: worker.changeProvider.bind(worker),
-    personal_sign: worker.personal_sign.bind(worker),
-    eth_sendTransaction: worker.eth_sendTransaction.bind(worker),
-    isLocked: worker.isLocked.bind(worker),
-    unlock: worker.unlock.bind(worker),
-    changeAccountPassword: worker.changeAccountPassword.bind(worker),
-    getPrivateKet: worker.getPrivateKet.bind(worker),
-};
+    let worker = new EmbeddedWalletWorker(FIRST_ENDPOINT);
 
-console.log('Worker started');
 
-await RPC.broadcast({rpcstarted: true})
+    const RPC = new HostRPC();
+    self.RPC = RPC;
 
-setInterval(async () => {
-    await RPC.broadcast({rpcstarted: true});
-}, 1000);
+    RPC.methods = {
+        eth_chainId: worker.eth_chainId.bind(worker),
+        getGasPrice: worker.getGasPrice.bind(worker),
+        generateNewAccount: worker.generateNewAccount.bind(worker),
+        loadAccount: worker.loadAccount.bind(worker),
+        getAddress: worker.getAddress.bind(worker),
+        isAuthorized: worker.isAuthorized.bind(worker),
+        hasSavedAccount: worker.hasSavedAccount.bind(worker),
+        getBalance: worker.getBalance.bind(worker),
+        getEncryptedAccount: worker.getEncryptedAccount.bind(worker),
+        setEncryptedAccount: worker.setEncryptedAccount.bind(worker),
+        removeEncryptedAccount: worker.removeEncryptedAccount.bind(worker),
+        loadAccountByPrivateKey: worker.loadAccountByPrivateKey.bind(worker),
+        changeProvider: worker.changeProvider.bind(worker),
+        personal_sign: worker.personal_sign.bind(worker),
+        eth_sendTransaction: worker.eth_sendTransaction.bind(worker),
+        isLocked: worker.isLocked.bind(worker),
+        unlock: worker.unlock.bind(worker),
+        changeAccountPassword: worker.changeAccountPassword.bind(worker),
+        getPrivateKet: worker.getPrivateKet.bind(worker),
+        recoverAccount: worker.recoverAccount.bind(worker),
+        extractRecoveryKeyData: worker.extractRecoveryKeyData.bind(worker),
+        lock: worker.lock.bind(worker),
+        isEverythingOk: worker.isEverythingOk.bind(worker)
+    };
 
-self.addEventListener('activate', event => {
-    console.log('Wallet: Service worker activated');
-    event.waitUntil(clients.claim());
-    console.log('Wallet: Service worker claimed clients');
-});
+    console.log('Worker started');
 
-self.addEventListener('install', function (event) {
-    console.log('Wallet: Service worker installed');
-});
+    await RPC.broadcast({rpcstarted: true})
 
-self.addEventListener('message', async event => {
+    setInterval(async () => {
+        await RPC.broadcast({rpcstarted: true});
+    }, 1000);
 
-    if (event.data.method) {
-        await RPC.request(event.data.id, event.data.method, event.data.params, event);
-    }
+    self.addEventListener('activate', event => {
+        console.log('Wallet: Service worker activated');
+        event.waitUntil(clients.claim());
+        console.log('Wallet: Service worker claimed clients');
+    });
 
-    // console.log('Received message:', event.data);
-    // Обработка сообщения
-});
+    self.addEventListener('install', function (event) {
+        console.log('Wallet: Service worker installed');
+    });
+
+    self.addEventListener('message', async event => {
+
+        if (event.data.method) {
+            await RPC.request(event.data.id, event.data.method, event.data.params, event);
+        }
+
+        // console.log('Received message:', event.data);
+        // Обработка сообщения
+    });
+
+} catch (e) {
+    console.error(e);
+}
 
 __webpack_async_result__();
 } catch(e) { __webpack_async_result__(e); } }, 1);
