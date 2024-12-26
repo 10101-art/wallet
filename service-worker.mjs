@@ -348,6 +348,7 @@ try {
 
     self.addEventListener('install', function (event) {
         console.log('Wallet: Service worker installed');
+        event.waitUntil(self.skipWaiting());
     });
 
     self.addEventListener('message', async event => {
