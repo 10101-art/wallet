@@ -1,16 +1,18 @@
-import {Web3} from "web3";
-import Keystorage from "./modules/Keystorage.mjs";
 import {createConnector} from "@wagmi/core";
 import EventEmitter from 'events';
-import ClientPageRPC from "./modules/ClientPageRPC.mjs";
 import FrontendWindows from "./modules/FrontendWindows.mjs";
+import EmbeddedWalletImplementation from "./EmbeddedWallet.mjs";
+import EmbeddedWalletRpc from "./EmbeddedWalletRpc.mjs";
 
-const SERVICE_WORKER_URL = '/dist/service-worker.js';
+
 const FIRST_ENDPOINT = 'https://cloudflare-eth.com';
 
+const embeddedWallet = new EmbeddedWalletImplementation(FIRST_ENDPOINT);
+const embeddedWalletRpcProxy = new EmbeddedWalletRpc(FIRST_ENDPOINT);
 
-//The RPCied version of the class
-class EmbeddedWallet extends EventEmitter {
+let selectedWalletProvider = embeddedWalletRpcProxy;
+
+class EmbeddedWalletProxy extends EventEmitter {
     constructor(urlOrProvider) {
         super();
         this.urlOrProvider = urlOrProvider;
@@ -22,100 +24,85 @@ class EmbeddedWallet extends EventEmitter {
     }
 
     async init() {
-        if (this.inited) {
-            return this.RPC;
+        try {
+            return await embeddedWalletRpcProxy.init();
+        }catch (e) {
+            console.error('Error:', e);
+            console.log('Switching to fallback local wallet');
+
+            selectedWalletProvider = embeddedWallet;
+            return await selectedWalletProvider.init();
         }
-        this.inited = true;
-        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-            try {
-                console.log('Wallet: Service worker registration...');
-                const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
-                console.log('Wallet: Service worker registered:', registration);
+    }
 
-                this.RPC = new ClientPageRPC(registration);
-                window.RPC = this.RPC;
-
-                await this.RPC.waitForActive();
-
-                if (this.urlOrProvider) {
-                    await this.changeProvider(this.urlOrProvider);
-                }
-
-
-                return this.RPC;
-
-            } catch (error) {
-                console.error('Wallet: Service worker registration failed:', error);
-                throw error;
-            }
-
-        }
+    async switchToFallback(){
+        selectedWalletProvider = embeddedWallet;
+        await selectedWalletProvider.init();
     }
 
     async changeProvider(urlOrProvider) {
-        //console.log('!!!changeProvider', urlOrProvider);
         this.urlOrProvider = urlOrProvider;
-        return await this.RPC.request('changeProvider', [urlOrProvider]);
+        return await selectedWalletProvider.changeProvider(urlOrProvider);
     }
 
     async eth_chainId() {
-        return Number(await this.RPC.request('eth_chainId'));
+        return await selectedWalletProvider.eth_chainId();
     }
 
     async getGasPrice() {
-        return await this.RPC.request('getGasPrice');
+        return await selectedWalletProvider.getGasPrice();
     }
 
     async getBalance(address) {
-        return await this.RPC.request('getBalance', [address]);
+        return await selectedWalletProvider.getBalance(address);
     }
 
     async getAddress() {
-        return await this.RPC.request('getAddress');
+        return await selectedWalletProvider.getAddress();
     }
 
     async isAuthorized() {
-        return await this.RPC.request('isAuthorized');
+       return await selectedWalletProvider.isAuthorized();
     }
 
     async hasSavedAccount() {
-        return await this.RPC.request('hasSavedAccount');
+        return await selectedWalletProvider.hasSavedAccount();
     }
 
     async changeAccountPassword(oldPassword, newPassword) {
-        return await this.RPC.request('changeAccountPassword', [oldPassword, newPassword]);
+        return await selectedWalletProvider.changeAccountPassword(oldPassword, newPassword);
     }
 
     async getEncryptedAccount() {
-        return await this.RPC.request('getEncryptedAccount');
+        return await selectedWalletProvider.getEncryptedAccount();
     }
 
     async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
-        return await this.RPC.request('setEncryptedAccount', [encryptedKey, accountName]);
+        return await selectedWalletProvider.setEncryptedAccount(encryptedKey, accountName);
     }
 
     async removeEncryptedAccount(accountName = 'mainAccount') {
-        return await this.RPC.request('removeEncryptedAccount', [accountName]);
+        return await selectedWalletProvider.removeEncryptedAccount(accountName);
     }
 
     async loadAccountByPrivateKey(privateKey, password = '', accountName = 'mainAccount') {
-        return await this.RPC.request('loadAccountByPrivateKey', [privateKey, password, accountName]);
+        return await selectedWalletProvider.loadAccountByPrivateKey(privateKey, password, accountName);
     }
 
     async loadAccount(password, accountName = 'mainAccount') {
-        return await this.RPC.request('loadAccount', [password, accountName]);
+        return await selectedWalletProvider.loadAccount(password, accountName);
     }
 
     async generateNewAccount(password = '', accountName = 'mainAccount', userRecoveryPassword = null) {
-        return await this.RPC.request('generateNewAccount', [password, accountName, userRecoveryPassword]);
+        return await selectedWalletProvider.generateNewAccount(password, accountName, userRecoveryPassword);
     }
 
     async recoverAccount(recoveryKey, userRecoveryPassword, newPassword) {
-        return await this.RPC.request('recoverAccount', [recoveryKey, userRecoveryPassword, newPassword]);
+        return await selectedWalletProvider.recoverAccount(recoveryKey, userRecoveryPassword, newPassword);
     }
 
     async extractRecoveryKeyData(recoveryKey) {
-        return await this.RPC.request('extractRecoveryKeyData', [recoveryKey]);
+        return await selectedWalletProvider.extractRecoveryKeyData(recoveryKey);
     }
 
     async getPrivateKey(accountName = 'mainAccount') {
@@ -129,7 +116,7 @@ class EmbeddedWallet extends EventEmitter {
                 });
             });
 
-            return await this.RPC.request('getPrivateKet', [password, accountName]);
+            return await selectedWalletProvider.getPrivateKey(password, accountName);
         } catch (error) {
             console.error('Error', error);
             throw error;
@@ -137,15 +124,15 @@ class EmbeddedWallet extends EventEmitter {
     }
 
     async isLocked() {
-        return await this.RPC.request('isLocked');
+        return await selectedWalletProvider.isLocked();
     }
 
     async unlock(password) {
-        return await this.RPC.request('unlock', [password]);
+        return await selectedWalletProvider.unlock(password);
     }
 
     async lock(){
-        return await this.RPC.request('lock',[]);
+        return await selectedWalletProvider.lock();
     }
 
     async personal_sign(message, address) {
@@ -171,7 +158,7 @@ class EmbeddedWallet extends EventEmitter {
                 await this.unlock(await FrontendWindows.requestPassword(this));
             }
 
-            return await this.RPC.request('personal_sign', [message, address]);
+            return await selectedWalletProvider.personal_sign(message, address);
         } catch (error) {
             console.error('Error during personal sign:', error);
             throw error;
@@ -196,7 +183,7 @@ class EmbeddedWallet extends EventEmitter {
                 await this.unlock(await FrontendWindows.requestPassword(this));
             }
 
-            return await this.RPC.request('eth_sendTransaction', [{data, from, to}]);
+            return await selectedWalletProvider.eth_sendTransaction(tx);
         } catch (error) {
             console.error('Error during transaction send:', error);
             throw error;
@@ -213,8 +200,7 @@ class EmbeddedWallet extends EventEmitter {
 
     async isEverythingOk() {
         try {
-            const status = await this.RPC.request('isEverythingOk');
-            return status;
+            return await selectedWalletProvider.isEverythingOk();
         } catch (error) {
             console.error('Error checking status:', error);
             return {
@@ -225,9 +211,10 @@ class EmbeddedWallet extends EventEmitter {
     }
 }
 
-export default EmbeddedWallet;
+export default EmbeddedWalletProxy;
 
-let wallet = new EmbeddedWallet(null);
+
+let wallet = new EmbeddedWalletProxy(null);
 
 wallet.init(); //TODO я хуй знает куда это вставить в асинхронном режиме, так что будет такой костыль, надеюсь будет работать
 
