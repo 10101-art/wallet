@@ -44,15 +44,15 @@ let notificationClickHandlerRegistred = false;
 let pushHandlerInterval = null;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function startPushHandler(userToken) {
-    console.log('Push handler started', userToken);
+async function startPushHandler(userToken, apiPath) {
+    console.log('Push handler started', userToken, apiPath);
 
     clearInterval(pushHandlerInterval);
 
     async function pushRequest() {
         try {
 
-            let result = await fetch('/v2/profile/notifications/getPushNotifications', {
+            let result = await fetch(`${apiPath}/v2/profile/notifications/getPushNotifications`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

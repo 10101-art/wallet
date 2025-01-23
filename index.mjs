@@ -346,7 +346,7 @@ export function embedded10101WalletConnector({
     })
 }
 
-export async function subscribeToNotifications(userToken) {
+export async function subscribeToNotifications(userToken, apiPath) {
 
     if (!('serviceWorker' in navigator)) {
         throw new Error('Service worker not supported');
@@ -357,7 +357,7 @@ export async function subscribeToNotifications(userToken) {
     }
 
     async function startWorkerPush() {
-        await embeddedWalletRpcProxy.RPC.request('startPushHandler', [userToken]);
+        await embeddedWalletRpcProxy.RPC.request('startPushHandler', [userToken, apiPath]);
     }
 
     if (Notification.permission !== 'granted') {
