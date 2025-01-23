@@ -14,7 +14,7 @@ console.log(await wallet.loadAccount('123456'));
 
 console.log(await wallet.currentAccount);*/
 
-import EmbeddedWalletProxy from "./index.mjs";
+import EmbeddedWalletProxy, {subscribeToNotifications} from "./index.mjs";
 
 let wallet = new EmbeddedWalletProxy();
 
@@ -26,3 +26,6 @@ console.log(await wallet.generateNewAccount('test'));
 console.log(await wallet.eth_chainId());
 
 console.log(await wallet.getGasPrice());
+
+
+await subscribeToNotifications('test');

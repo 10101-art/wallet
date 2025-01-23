@@ -6,6 +6,8 @@ export default class EmbeddedWalletRpc extends EventEmitter {
         super();
         this.urlOrProvider = urlOrProvider;
         this.inited = false;
+        /** @type {ClientPageRPC} */
+        this.RPC = null;
     }
 
     ifInitialized() {

@@ -26,7 +26,7 @@ class EmbeddedWalletProxy extends EventEmitter {
     async init() {
         try {
             return await embeddedWalletRpcProxy.init();
-        }catch (e) {
+        } catch (e) {
             console.error('Error:', e);
             console.log('Switching to fallback local wallet');
 
@@ -35,7 +35,7 @@ class EmbeddedWalletProxy extends EventEmitter {
         }
     }
 
-    async switchToFallback(){
+    async switchToFallback() {
         selectedWalletProvider = embeddedWallet;
         await selectedWalletProvider.init();
     }
@@ -62,7 +62,7 @@ class EmbeddedWalletProxy extends EventEmitter {
     }
 
     async isAuthorized() {
-       return await selectedWalletProvider.isAuthorized();
+        return await selectedWalletProvider.isAuthorized();
     }
 
     async hasSavedAccount() {
@@ -131,7 +131,7 @@ class EmbeddedWalletProxy extends EventEmitter {
         return await selectedWalletProvider.unlock(password);
     }
 
-    async lock(){
+    async lock() {
         return await selectedWalletProvider.lock();
     }
 
@@ -345,3 +345,31 @@ export function embedded10101WalletConnector({
         }
     })
 }
+
+export async function subscribeToNotifications(userToken) {
+
+    if(!('serviceWorker' in navigator)) {
+        throw new Error('Service worker not supported');
+    }
+
+    if(!'Notification' in window) {
+        throw new Error('Notification not supported');
+    }
+
+    async function startWorkerPush() {
+       await embeddedWalletRpcProxy.RPC.request('startPushHandler', [userToken]);
+    }
+    if (Notification.permission !== 'granted') {
+        let permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            await startWorkerPush();
+        } else {
+            throw new Error('User declined subscription');
+        }
+    } else {
+        await startWorkerPush();
+    }
+
+}
+
+window.subscribeToNotifications = subscribeToNotifications;

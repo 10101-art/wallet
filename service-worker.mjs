@@ -1,8 +1,6 @@
-
 import EmbeddedWalletImplementation from "./EmbeddedWallet.mjs";
 
 const FIRST_ENDPOINT = 'https://cloudflare-eth.com';
-
 
 
 class HostRPC {
@@ -42,6 +40,71 @@ class HostRPC {
     }
 }
 
+let notificationClickHandlerRegistred = false;
+let pushHandlerInterval = null;
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function startPushHandler(userToken) {
+    console.log('Push handler started', userToken);
+
+    clearInterval(pushHandlerInterval);
+
+    async function pushRequest() {
+        try {
+
+            let result = await fetch('/v2/profile/notifications/getPushNotifications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + userToken
+                },
+                body: JSON.stringify({limit: 5})
+            });
+
+
+            let notifications = await result.json();
+            console.log('Push notifications', notifications);
+
+            for (let notification of notifications) {
+                await self.registration.showNotification(notification.data.title || notification.message, {
+                    body: notification.message,
+                    icon: notification.data.icon || '/images/favicon-32x32.png',
+                    data: notification.data.data || {},
+                });
+
+                await wait(5000);
+            }
+
+
+        } catch (e) {
+            console.error('Error in pushRequest', e);
+        }
+    }
+
+    pushHandlerInterval = setInterval(pushRequest, 300000);
+    await pushRequest();
+}
+
+self.addEventListener('notificationclick', event => {
+    console.log('Notification click', event);
+    event.notification.close();
+
+    const urlToOpen = event.notification?.data?.url || '/';
+    event.waitUntil(
+        clients.matchAll({type: 'window', includeUncontrolled: true}).then(clientList => {
+            for (const client of clientList) {
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
+});
+
+
 try {
 
     let embeddedWallet = new EmbeddedWalletImplementation(FIRST_ENDPOINT);
@@ -74,7 +137,8 @@ try {
         recoverAccount: embeddedWallet.recoverAccount.bind(embeddedWallet),
         extractRecoveryKeyData: embeddedWallet.extractRecoveryKeyData.bind(embeddedWallet),
         lock: embeddedWallet.lock.bind(embeddedWallet),
-        isEverythingOk: embeddedWallet.isEverythingOk.bind(embeddedWallet)
+        isEverythingOk: embeddedWallet.isEverythingOk.bind(embeddedWallet),
+        startPushHandler: startPushHandler
     };
 
     console.log('Worker started');
