@@ -348,17 +348,18 @@ export function embedded10101WalletConnector({
 
 export async function subscribeToNotifications(userToken) {
 
-    if(!('serviceWorker' in navigator)) {
+    if (!('serviceWorker' in navigator)) {
         throw new Error('Service worker not supported');
     }
 
-    if(!'Notification' in window) {
+    if (!'Notification' in window) {
         throw new Error('Notification not supported');
     }
 
     async function startWorkerPush() {
-       await embeddedWalletRpcProxy.RPC.request('startPushHandler', [userToken]);
+        await embeddedWalletRpcProxy.RPC.request('startPushHandler', [userToken]);
     }
+
     if (Notification.permission !== 'granted') {
         let permission = await Notification.requestPermission();
         if (permission === 'granted') {
@@ -372,4 +373,6 @@ export async function subscribeToNotifications(userToken) {
 
 }
 
-window.subscribeToNotifications = subscribeToNotifications;
+if (typeof window !== 'undefined') {
+    window.subscribeToNotifications = subscribeToNotifications;
+}
