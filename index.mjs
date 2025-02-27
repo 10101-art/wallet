@@ -285,7 +285,7 @@ export function embedded10101WalletConnector({
                     } else {
                         wallet.emit('account_action_request');
 
-                        const {action, privateKey, password} = await new Promise((resolve, reject) => {
+                        const {action, privateKey, password, userRecoveryPassword} = await new Promise((resolve, reject) => {
                             wallet.once('account_action_provided', resolve);
                             wallet.once('account_action_rejected', () => {
                                 reject(new Error('User rejected the account action request.'));
@@ -293,7 +293,7 @@ export function embedded10101WalletConnector({
                         });
 
                         if (action === 'generate') {
-                            const generatedAccount = await wallet.generateNewAccount(password);
+                            const generatedAccount = await wallet.generateNewAccount(password, 'mainAccount', userRecoveryPassword);
                             wallet.emit('private_key_provided', generatedAccount);
                             await wallet.loadAccount(password);
                         } else if (action === 'import') {
