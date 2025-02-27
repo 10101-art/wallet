@@ -1,4 +1,5 @@
 import EmbeddedWalletImplementation from "./EmbeddedWallet.mjs";
+import IndexedDBKeyValueStore from "./modules/IndexedDBKeyValueStore.mjs";
 
 const FIRST_ENDPOINT = 'https://cloudflare-eth.com';
 
@@ -40,9 +41,10 @@ class HostRPC {
     }
 }
 
-let notificationClickHandlerRegistred = false;
+//Notifications
 let pushHandlerInterval = null;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+let notificationsDb = new IndexedDBKeyValueStore('notifications', 'notifications');
 
 async function startPushHandler(userToken, apiPath) {
     console.log('Push handler started', userToken, apiPath);
@@ -83,7 +85,22 @@ async function startPushHandler(userToken, apiPath) {
 
     pushHandlerInterval = setInterval(pushRequest, 300000);
     await pushRequest();
+
+    await notificationsDb.set('userToken', userToken);
+    await notificationsDb.set('apiPath', apiPath);
+
+
 }
+
+//Restore push handler
+(async () => {
+    let userToken = await notificationsDb.get('userToken');
+    let apiPath = await notificationsDb.get('apiPath');
+
+    if (userToken && apiPath) {
+        await startPushHandler(userToken, apiPath);
+    }
+})();
 
 self.addEventListener('notificationclick', event => {
     console.log('Notification click', event);

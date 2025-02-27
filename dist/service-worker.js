@@ -53320,6 +53320,8 @@ var z = /*#__PURE__*/Object.freeze({
 __webpack_require__.a(__webpack_module__, async (__webpack_handle_async_dependencies__, __webpack_async_result__) => { try {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _EmbeddedWallet_mjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EmbeddedWallet.mjs */ "./EmbeddedWallet.mjs");
+/* harmony import */ var _modules_IndexedDBKeyValueStore_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./modules/IndexedDBKeyValueStore.mjs */ "./modules/IndexedDBKeyValueStore.mjs");
+
 
 
 const FIRST_ENDPOINT = 'https://cloudflare-eth.com';
@@ -53362,9 +53364,10 @@ class HostRPC {
     }
 }
 
-let notificationClickHandlerRegistred = false;
+//Notifications
 let pushHandlerInterval = null;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+let notificationsDb = new _modules_IndexedDBKeyValueStore_mjs__WEBPACK_IMPORTED_MODULE_1__["default"]('notifications', 'notifications');
 
 async function startPushHandler(userToken, apiPath) {
     console.log('Push handler started', userToken, apiPath);
@@ -53405,7 +53408,22 @@ async function startPushHandler(userToken, apiPath) {
 
     pushHandlerInterval = setInterval(pushRequest, 300000);
     await pushRequest();
+
+    await notificationsDb.set('userToken', userToken);
+    await notificationsDb.set('apiPath', apiPath);
+
+
 }
+
+//Restore push handler
+(async () => {
+    let userToken = await notificationsDb.get('userToken');
+    let apiPath = await notificationsDb.get('apiPath');
+
+    if (userToken && apiPath) {
+        await startPushHandler(userToken, apiPath);
+    }
+})();
 
 self.addEventListener('notificationclick', event => {
     console.log('Notification click', event);
