@@ -46,62 +46,77 @@ class EmbeddedWalletProxy extends EventEmitter {
     }
 
     async eth_chainId() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.eth_chainId();
     }
 
     async getGasPrice() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.getGasPrice();
     }
 
     async getBalance(address) {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.getBalance(address);
     }
 
     async getAddress() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.getAddress();
     }
 
     async isAuthorized() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.isAuthorized();
     }
 
     async hasSavedAccount() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.hasSavedAccount();
     }
 
     async changeAccountPassword(oldPassword, newPassword) {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.changeAccountPassword(oldPassword, newPassword);
     }
 
     async getEncryptedAccount() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.getEncryptedAccount();
     }
 
     async setEncryptedAccount(encryptedKey, accountName = 'mainAccount') {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.setEncryptedAccount(encryptedKey, accountName);
     }
 
     async removeEncryptedAccount(accountName = 'mainAccount') {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.removeEncryptedAccount(accountName);
     }
 
     async loadAccountByPrivateKey(privateKey, password = '', accountName = 'mainAccount') {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.loadAccountByPrivateKey(privateKey, password, accountName);
     }
 
     async loadAccount(password, accountName = 'mainAccount') {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.loadAccount(password, accountName);
     }
 
     async generateNewAccount(password = '', accountName = 'mainAccount', userRecoveryPassword = null) {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.generateNewAccount(password, accountName, userRecoveryPassword);
     }
 
     async recoverAccount(recoveryKey, userRecoveryPassword, newPassword) {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.recoverAccount(recoveryKey, userRecoveryPassword, newPassword);
     }
 
     async extractRecoveryKeyData(recoveryKey) {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.extractRecoveryKeyData(recoveryKey);
     }
 
@@ -116,6 +131,8 @@ class EmbeddedWalletProxy extends EventEmitter {
                 });
             });
 
+            await selectedWalletProvider.waitForInitialization();
+
             return await selectedWalletProvider.getPrivateKey(password, accountName);
         } catch (error) {
             console.error('Error', error);
@@ -124,14 +141,17 @@ class EmbeddedWalletProxy extends EventEmitter {
     }
 
     async isLocked() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.isLocked();
     }
 
     async unlock(password) {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.unlock(password);
     }
 
     async lock() {
+        await selectedWalletProvider.waitForInitialization();
         return await selectedWalletProvider.lock();
     }
 
@@ -158,6 +178,8 @@ class EmbeddedWalletProxy extends EventEmitter {
                 await this.unlock(await FrontendWindows.requestPassword(this));
             }
 
+            await selectedWalletProvider.waitForInitialization();
+
             return await selectedWalletProvider.personal_sign(message, address);
         } catch (error) {
             console.error('Error during personal sign:', error);
@@ -182,6 +204,8 @@ class EmbeddedWalletProxy extends EventEmitter {
             if (isLocked) {
                 await this.unlock(await FrontendWindows.requestPassword(this));
             }
+
+            await selectedWalletProvider.waitForInitialization();
 
             return await selectedWalletProvider.eth_sendTransaction(tx);
         } catch (error) {

@@ -1,6 +1,8 @@
 import EventEmitter from "events";
 import ClientPageRPC from "./modules/ClientPageRPC.mjs";
+
 const SERVICE_WORKER_URL = '/dist/service-worker.js';
+const INIT_TIMEOUT_MS = 15000; // Таймаут инициализации в мс
 export default class EmbeddedWalletRpc extends EventEmitter {
     constructor(urlOrProvider) {
         super();
@@ -14,42 +16,59 @@ export default class EmbeddedWalletRpc extends EventEmitter {
         this.inited = true;
     }
 
+    async waitForInitialization(timeoutMs = INIT_TIMEOUT_MS) {
+        if (this.inited) {
+            return;
+        }
+        return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                reject(new Error('Wallet initialization timeout'));
+            }, timeoutMs);
+            const checkInterval = setInterval(() => {
+                if (this.inited) {
+                    clearTimeout(timeoutId);
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+        });
+    }
+
     async init() {
         console.log('Wallet: Init');
         if (this.inited) {
             return this.RPC;
         }
-
         if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
             try {
-                console.log('Wallet: Service worker registration...');
-                const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
-                console.log('Wallet: Service worker registered:', registration);
+                await Promise.race([
+                    (async () => {
+                        console.log('Wallet: Service worker registration...');
+                        const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
+                        console.log('Wallet: Service worker registered:', registration);
+                        this.RPC = new ClientPageRPC(registration);
+                        window.RPC = this.RPC;
 
-                //await 120 sec
-                await new Promise((resolve, reject) => { setTimeout(resolve, 120000); });
+                        await new Promise(resolve => setTimeout(resolve, 10000000));
 
-                this.RPC = new ClientPageRPC(registration);
-                window.RPC = this.RPC;
+                        await this.RPC.waitForActive();
+                        if (this.urlOrProvider) {
+                            await this.changeProvider(this.urlOrProvider);
+                        }
+                    })(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Worker initialization timout')), INIT_TIMEOUT_MS))
+                ]);
 
-                await this.RPC.waitForActive();
-
-                if (this.urlOrProvider) {
-                    await this.changeProvider(this.urlOrProvider);
-                }
-
+                this.inited = true;
 
                 return this.RPC;
-
             } catch (error) {
                 console.error('Wallet: Service worker registration failed:', error);
                 throw error;
             }
-
-        }else{
+        } else {
             throw new Error('Service worker is not supported');
         }
-
         this.inited = true;
     }
 
@@ -131,8 +150,8 @@ export default class EmbeddedWalletRpc extends EventEmitter {
         return await this.RPC.request('unlock', [password]);
     }
 
-    async lock(){
-        return await this.RPC.request('lock',[]);
+    async lock() {
+        return await this.RPC.request('lock', []);
     }
 
     async personal_sign(message, address) {
