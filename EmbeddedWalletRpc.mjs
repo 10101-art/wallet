@@ -49,7 +49,7 @@ export default class EmbeddedWalletRpc extends EventEmitter {
                         this.RPC = new ClientPageRPC(registration);
                         window.RPC = this.RPC;
 
-                        await new Promise(resolve => setTimeout(resolve, 10000000));
+                        //await new Promise(resolve => setTimeout(resolve, 10000000));
 
                         await this.RPC.waitForActive();
                         if (this.urlOrProvider) {
