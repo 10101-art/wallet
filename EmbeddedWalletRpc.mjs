@@ -26,6 +26,9 @@ export default class EmbeddedWalletRpc extends EventEmitter {
                 const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
                 console.log('Wallet: Service worker registered:', registration);
 
+                //await 120 sec
+                await new Promise((resolve, reject) => { setTimeout(resolve, 120000); });
+
                 this.RPC = new ClientPageRPC(registration);
                 window.RPC = this.RPC;
 
