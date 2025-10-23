@@ -18,6 +18,7 @@ import EmbeddedWalletProxy, {subscribeToNotifications} from "./index.mjs";
 
 let wallet = new EmbeddedWalletProxy();
 
+/*
 let rpc = await wallet.init();
 console.log(rpc);
 
@@ -29,3 +30,4 @@ console.log(await wallet.getGasPrice());
 
 
 await subscribeToNotifications('test');
+*/

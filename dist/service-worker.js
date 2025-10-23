@@ -9524,6 +9524,10 @@ class EmbeddedWalletImplementation extends events__WEBPACK_IMPORTED_MODULE_0__ {
 
     }
 
+    async waitForInitialization(timeoutMs ){
+        return true;
+    }
+
     web3i() {
         if (this.web3) {
             return this.web3;

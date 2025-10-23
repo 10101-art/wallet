@@ -16,6 +16,10 @@ export default class EmbeddedWalletImplementation extends EventEmitter {
 
     }
 
+    async waitForInitialization(timeoutMs ){
+        return true;
+    }
+
     web3i() {
         if (this.web3) {
             return this.web3;
